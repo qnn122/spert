@@ -242,7 +242,7 @@ def _parse_tokens(jtokens, dataset, tokenizer):
         doc_tokens.append(token)
         doc_encoding += token_encoding
 
-    if len(doc_encoding) >= 512:
+    if len(doc_encoding) >= 512: # TODO: handle this better
         doc_encoding = doc_encoding[:511]
     doc_encoding += [tokenizer.convert_tokens_to_ids('[SEP]')]
 

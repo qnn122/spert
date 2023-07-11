@@ -17,6 +17,7 @@ import random
 import argparse
 import csv
 from transformers import AutoTokenizer
+import numpy as np
 
 
 _VABERT_TYPES = {
@@ -143,20 +144,8 @@ def char2tok(char_data, tokenizer):
 	# Return the tokenized data
 	return tokens, tok_entities
 
-def make_data(args):
-	# Load tokenizer
-	tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
 
-	# Load data
-	data_dir = args.data_dir
-	json_files = [file for file in os.listdir(data_dir) if file.endswith('.json')]
-
-	# load all lines in all json files using srsly.read_json
-	lines = []
-	for file in json_files:
-		lines.extend(srsly.read_json(os.path.join(data_dir, file)))
-
-	# 
+def process(lines, tokenizer):
 	data_all = []
 	for line in tqdm(lines):
 		text, ents, rels, _id = get_annotation(line)
@@ -173,6 +162,7 @@ def make_data(args):
 		tokens, tok_entities = char2tok({"text": text, "entities": ents}, tokenizer)
 		data["tokens"] = tokens
 		data["entities"] = tok_entities
+		data["text"] = text # for debugging, model does not use this
 		
 		# Make RE data ---------------------------------------------------------
 		ents_ids = [e['id'] for e in ents]
@@ -183,10 +173,32 @@ def make_data(args):
 		]
 		data["relations"] = relations
 		data_all.append(data)
+	
+	return data_all
+
+def make_data(args):
+	# Load tokenizer
+	tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
+
+	# Load data
+	data_dir = args.data_dir
+	json_files = [file for file in os.listdir(data_dir) if file.endswith('.json')]
+
+	# load all lines in all json files using srsly.read_json
+	lines = []
+	for file in json_files:
+		lines.extend(srsly.read_json(os.path.join(data_dir, file)))
 
 	# Split data ---------------------------------------------------------------
-	train, test = train_test_split(data_all, test_size=0.2)
-	train, dev = train_test_split(train, test_size=0.1)
+	np.random.seed(42)
+	np.random.shuffle(lines)
+	train, dev, test = np.split(lines, [int(.7*len(lines)), int(.8*len(lines))])
+
+	# Process data --------------------------------------------------------------
+	train = process(train, tokenizer)
+	dev = process(dev, tokenizer)
+	test = process(test, tokenizer)
+	data_all = train + dev + test
 
 	# Save output -------------------------------------------------------------
 	output_dir = args.output_dir
@@ -202,8 +214,8 @@ def make_data(args):
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--data_dir", default='/home/quangng/vabert/data/v1.2', type=str, help="Data directory")
-	parser.add_argument("--output_dir", default='data/datasets/vabert', type=str, help="Output directory")
+	parser.add_argument("--data_dir", default='/mnt/data/quangng/vabert/data/v1.2', type=str, help="Data directory")
+	parser.add_argument("--output_dir", default='data/datasets/vabert_eyebert', type=str, help="Output directory")
 	parser.add_argument("--tokenizer_name", default='bert-base-cased', type=str, help="Tokenizer name or path")
 
 	args = parser.parse_args()
