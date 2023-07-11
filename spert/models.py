@@ -36,7 +36,7 @@ class SpERT(BertPreTrainedModel):
         # layers
         self.rel_classifier = nn.Linear(config.hidden_size * 3 + size_embedding * 2, relation_types)
         self.entity_classifier = nn.Linear(config.hidden_size * 2 + size_embedding, entity_types)
-        self.size_embeddings = nn.Embedding(100, size_embedding)
+        self.size_embeddings = nn.Embedding(self.config.vocab_size, size_embedding)
         self.dropout = nn.Dropout(prop_drop)
 
         self._cls_token = cls_token
