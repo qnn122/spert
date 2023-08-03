@@ -223,6 +223,14 @@ class JsonPredictionInputReader(BaseInputReader):
 
         return document
 
+class JsonPredictionInputReaderCustom(JsonPredictionInputReader):
+
+    def _parse_dataset(self, dataset_path, dataset):
+        documents = [{'tokens': self._tokenizer.tokenize(dataset_path)}]
+        for document in tqdm(documents, desc="Parse dataset '%s'" % dataset.label):
+            self._parse_document(document, dataset)
+
+    
 
 def _parse_tokens(jtokens, dataset, tokenizer):
     doc_tokens = []

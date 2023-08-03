@@ -10,6 +10,9 @@ def process_configs(target, arg_parser):
         p = ctx.Process(target=target, args=(run_args,))
         p.start()
         p.join()
+        
+    print('>>> Processed all configs. Done')
+    
 
 
 def _read_config(path):

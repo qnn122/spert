@@ -146,6 +146,20 @@ class SpERTTrainer(BaseTrainer):
         model.to(self._device)
 
         self._predict(model, dataset, input_reader)
+    
+    def predict_custom(self, dataset_path: str, types_path: str, input_reader_cls: Type[BaseInputReader]):
+        args = self._args
+
+        # read datasets
+        input_reader = input_reader_cls(types_path, self._tokenizer,
+                                        max_span_size=args.max_span_size,
+                                        spacy_model=args.spacy_model)
+        dataset = input_reader.read(dataset_path, 'dataset')
+
+        model = self._load_model(input_reader)
+        model.to(self._device)
+
+        self._predict(model, dataset, input_reader)
 
     def _load_model(self, input_reader):
         model_class = models.get_model(self._args.model_type)
@@ -284,6 +298,20 @@ class SpERTTrainer(BaseTrainer):
                 predictions = prediction.convert_predictions(entity_clf, rel_clf, rels,
                                                              batch, self._args.rel_filter_threshold,
                                                              input_reader)
+
+                sent = self._tokenizer.decode(batch['encodings'][0])
+                tokens = self._tokenizer.convert_ids_to_tokens(batch['encodings'][0])
+
+                results = []
+                for rel in predictions[1][0]:
+                    e1_span, e2_span, rel_type, score = rel
+                    e1_str = ''.join(tokens[e1_span[0]:e1_span[1]]).replace('#', '')
+                    e2_str = ''.join(tokens[e2_span[0]:e2_span[1]]).replace('#', '')
+                    rel_type = rel_type.short_name
+                    results.append((e1_str, e2_str, rel_type))
+
+                for rel in predictions[1][0]: print(rel)
+                for ent in predictions[0][0]: print(ent)
 
                 batch_pred_entities, batch_pred_relations = predictions
                 pred_entities.extend(batch_pred_entities)
