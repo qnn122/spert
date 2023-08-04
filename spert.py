@@ -33,7 +33,7 @@ def __eval(run_args):
 
 def _predict():
     arg_parser = predict_argparser()
-    process_configs(target=__predict_custom, arg_parser=arg_parser)
+    process_configs(target=__predict_custom_omar, arg_parser=arg_parser)
 
 
 def __predict(run_args):
@@ -44,9 +44,17 @@ def __predict(run_args):
 def __predict_custom(run_args):
     trainer = SpERTTrainer(run_args)
 
-    text = 'The above mentioned patient attended our clinic today. On slit-lamp examination there has been observed a pterygium on the left eye. His vision is 6/5 right (unaided) and 6/9 left (unaided). Intraocular pressure was within normal range bilaterally. '
+    #text = 'The above mentioned patient attended our clinic today. On slit-lamp examination there has been observed a pterygium on the left eye. His vision is 6/5 right (unaided) and 6/9 left (unaided). Intraocular pressure was within normal range bilaterally. '
+    text = "Diagnosis\nBilateral macular atrophy\n\nVision\nRE 6/12\nLE 6/18 ph 6/12\nI would be grateful if you would kindly arrange to see this 55 year old gentleman in clinic today.\nHe has experienced gradual deteroration of the vision of his left eye over the past 2 years."
     trainer.predict_custom(dataset_path=text, types_path=run_args.types_path,
                     input_reader_cls=input_reader.JsonPredictionInputReaderCustom)
+
+def __predict_custom_omar(run_args):
+    trainer = SpERTTrainer(run_args)
+
+    dataset_path = 'data/omar/omar_va_flatten_with_letters.csv'
+    trainer.predict_custom(dataset_path=dataset_path, types_path=run_args.types_path,
+                    input_reader_cls=input_reader.JsonPredictionInputReaderCustomOmar)
 
 
 if __name__ == '__main__':

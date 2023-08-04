@@ -9,7 +9,8 @@ from transformers import BertTokenizer
 from spert import util
 from spert.entities import Dataset, EntityType, RelationType, Entity, Relation, Document
 from spert.opt import spacy
-
+import html2text
+from striprtf.striprtf import rtf_to_text
 
 class BaseInputReader(ABC):
     def __init__(self, types_path: str, tokenizer: BertTokenizer, neg_entity_count: int = None,
@@ -224,13 +225,45 @@ class JsonPredictionInputReader(BaseInputReader):
         return document
 
 class JsonPredictionInputReaderCustom(JsonPredictionInputReader):
+    '''
+    This class process one document (plain text) at a time, and is used for the custom input
+    '''
 
     def _parse_dataset(self, dataset_path, dataset):
+        """
+        dataset_path: the input string
+        """
         documents = [{'tokens': self._tokenizer.tokenize(dataset_path)}]
         for document in tqdm(documents, desc="Parse dataset '%s'" % dataset.label):
             self._parse_document(document, dataset)
 
-    
+class JsonPredictionInputReaderCustomOmar(JsonPredictionInputReader):
+
+    def _parse_dataset(self, dataset_path, dataset):
+        import pandas as pd
+        df = pd.read_csv(dataset_path)
+        df = df.dropna(subset=['FoundLetters']).reset_index(drop=True)
+
+        documents = []
+        for i, row in df.iterrows():
+            letter = row['FoundLetters']
+            letter = preprocess(letter)
+            documents.append({'original_id': i, 'tokens': self._tokenizer.tokenize(letter)})
+
+        for document in tqdm(documents, desc="Parse dataset '%s'" % dataset.label):
+            self._parse_document(document, dataset)
+
+def preprocess(letter):
+	#letter = html2text.html2text(letter)
+	if '<p>' in letter:
+		letter = html2text.html2text(letter)
+	if "{\\rtf1" in letter: # UnicodeEncodeError: 'charmap' codec can't encode character '\u02da' in position 0: character maps to <undefined>
+		try: 
+			letter = rtf_to_text(letter)
+		except:
+			pass
+	#letter = letter.replace('\n', '\\n')
+	return letter
 
 def _parse_tokens(jtokens, dataset, tokenizer):
     doc_tokens = []

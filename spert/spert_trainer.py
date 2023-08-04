@@ -278,21 +278,30 @@ class SpERTTrainer(BaseTrainer):
         pred_entities = []
         pred_relations = []
 
+        results_all = []
+        sents = []
         with torch.no_grad():
             model.eval()
 
             # iterate batches
             total = math.ceil(dataset.document_count / self._args.eval_batch_size)
-            for batch in tqdm(data_loader, total=total, desc='Predict'):
+            for idb, batch in enumerate(tqdm(data_loader, total=total, desc='Predict')):
                 # move batch to selected device
                 batch = util.to_device(batch, self._device)
 
                 # run model (forward pass)
-                result = model(encodings=batch['encodings'], context_masks=batch['context_masks'],
-                               entity_masks=batch['entity_masks'], entity_sizes=batch['entity_sizes'],
-                               entity_spans=batch['entity_spans'], entity_sample_masks=batch['entity_sample_masks'],
-                               inference=True)
-                entity_clf, rel_clf, rels = result
+                try:
+                    preds = model(encodings=batch['encodings'], context_masks=batch['context_masks'],
+                                entity_masks=batch['entity_masks'], entity_sizes=batch['entity_sizes'],
+                                entity_spans=batch['entity_spans'], entity_sample_masks=batch['entity_sample_masks'],
+                                inference=True)
+                except:
+                    print('Out of memory error, skipping batch')
+                    results_all.append('error')
+                    sents.append(None)
+                    continue
+                
+                entity_clf, rel_clf, rels = preds
 
                 # convert predictions
                 predictions = prediction.convert_predictions(entity_clf, rel_clf, rels,
@@ -300,23 +309,81 @@ class SpERTTrainer(BaseTrainer):
                                                              input_reader)
 
                 sent = self._tokenizer.decode(batch['encodings'][0])
+                sents.append(sent)
                 tokens = self._tokenizer.convert_ids_to_tokens(batch['encodings'][0])
 
-                results = []
-                for rel in predictions[1][0]:
-                    e1_span, e2_span, rel_type, score = rel
-                    e1_str = ''.join(tokens[e1_span[0]:e1_span[1]]).replace('#', '')
-                    e2_str = ''.join(tokens[e2_span[0]:e2_span[1]]).replace('#', '')
-                    rel_type = rel_type.short_name
-                    results.append((e1_str, e2_str, rel_type))
+                rel_parsed = []
 
-                for rel in predictions[1][0]: print(rel)
-                for ent in predictions[0][0]: print(ent)
+                
+                rels = predictions[1][0]
+                ents = predictions[0][0]
+
+                if idb == 281:
+                    print('here')
+
+                if len(rels) > 0:
+                    for rel in rels: print(rel)
+                    for ent in ents: print(ent) 
+
+                    results = []
+                    result = ['-', '-', '-']
+                    
+                    for idx, rel in enumerate(rels):                            
+                        e1, e2, rel_type, score = rel
+                        e1_str = ''.join(tokens[e1[0]:e1[1]]).replace('#', '')
+                        e2_str = ''.join(tokens[e2[0]:e2[1]]).replace('#', '')
+                        rel_type = rel_type.short_name
+                        rel_parsed.append((e1_str, e2_str, rel_type))
+
+                        if idx==0:
+                            va_target = e1
+                            result[0] = e1_str
+
+                        '''
+                        if e1 == va_target:
+                            if e2[2].identifier == 'LAT':
+                                result[1] = e2_str
+                            if e2[2].identifier == 'ET':
+                                result[2] = e2_str
+                        else:
+                            results.append(result)
+                            result = ['-', '-', '-']
+                            va_target = e1
+                            result[0] = e1_str
+
+                            if e2[2].identifier == 'LAT':
+                                result[1] = e2_str
+                            if e2[2].identifier == 'ET':
+                                result[2] = e2_str
+                        '''
+                        if e1 != va_target:
+                            results.append(result)
+                            result = ['-', '-', '-']
+                            va_target = e1
+                            result[0] = e1_str
+                        
+                        if e2[2].identifier == 'LAT':
+                                result[1] = e2_str
+                        if e2[2].identifier == 'ET':
+                                result[2] = e2_str
+                        
+                        if idx == len(rels)-1:
+                            results.append(result)
+                        
+                        if idx == 282:
+                            print('here')
+
+                    results_all.append(results)
+                else:
+                    results_all.append(None)
 
                 batch_pred_entities, batch_pred_relations = predictions
                 pred_entities.extend(batch_pred_entities)
                 pred_relations.extend(batch_pred_relations)
 
+        import pandas as pd
+        df_results = pd.DataFrame(results_all, columns=['preds'])
+        df_results.to_csv('data/omar/omar_va_flatten_with_letters_pred.csv')
         prediction.store_predictions(dataset.documents, pred_entities, pred_relations, self._args.predictions_path)
 
     def _get_optimizer_params(self, model):
